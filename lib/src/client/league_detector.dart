@@ -12,13 +12,13 @@ class LeagueDetector {
     try {
       final result = await _processManager.run([
         'tasklist',
-        '/FI', 'IMAGENAME eq LeagueClient.exe',
+        '/FI', 'IMAGENAME eq LeagueClientUx.exe',
         '/FO', 'CSV'
       ]);
 
       if (result.exitCode == 0) {
         final output = result.stdout as String;
-        return output.contains('LeagueClient.exe');
+        return output.contains('LeagueClientUx.exe');
       }
       return false;
     } catch (e) {
@@ -34,7 +34,7 @@ class LeagueDetector {
         'wmic',
         'process',
         'where',
-        'name="LeagueClient.exe"',
+        'name="LeagueClientUx.exe"',
         'get',
         'ExecutablePath',
         '/value'
@@ -73,7 +73,7 @@ class LeagueDetector {
         'wmic',
         'process',
         'where',
-        'name="LeagueClient.exe"',
+        'name="LeagueClientUx.exe"',
         'get',
         'ProcessId,ExecutablePath',
         '/value'

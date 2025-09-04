@@ -68,7 +68,7 @@ class LcuScanner {
         'wmic',
         'process',
         'where',
-        'name="LeagueClient.exe"',
+        'name="LeagueClientUx.exe"',
         'get',
         'CommandLine',
         '/format:csv'
@@ -79,9 +79,9 @@ class LcuScanner {
         final lines = output.split('\n');
         
         for (final line in lines) {
-          if (line.contains('LeagueClient.exe')) {
+          if (line.contains('LeagueClientUx.exe')) {
             // Extract installation directory from command line
-            final regex = RegExp(r'"([^"]*LeagueClient\.exe)"');
+            final regex = RegExp(r'"([^"]*LeagueClientUx\.exe)"');
             final match = regex.firstMatch(line);
             if (match != null) {
               final exePath = match.group(1)!;
