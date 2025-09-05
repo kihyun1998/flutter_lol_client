@@ -62,13 +62,10 @@ class _LeagueClientExampleState extends State<LeagueClientExample> {
       // Get installation path
       installPath = await LeagueDetector.getLeagueInstallationPath();
 
-      // Scan for LCU connection
-      connection = await LcuScanner.scanForClient();
-
-      // Create client and get summoner info
-      client = LcuClient(connection!);
-      final summonerApi = SummonerApi(client);
-      final currentSummoner = await summonerApi.getCurrentSummoner();
+      // Connect to League client directly
+      client = await LcuClient.connect();
+      connection = client.connection;
+      final currentSummoner = await client.summoner.getCurrentSummoner();
 
       setState(() {
         isConnected = true;
@@ -99,9 +96,8 @@ class _LeagueClientExampleState extends State<LeagueClientExample> {
     LcuClient? client;
 
     try {
-      client = LcuClient(connection!);
-      final summonerApi = SummonerApi(client);
-      final currentSummoner = await summonerApi.getCurrentSummoner();
+      client = LcuClient.create(connection!);
+      final currentSummoner = await client.summoner.getCurrentSummoner();
 
       setState(() {
         summoner = currentSummoner;

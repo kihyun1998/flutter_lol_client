@@ -5,15 +5,24 @@ import 'package:http/io_client.dart';
 
 import '../exceptions/lcu_exceptions.dart';
 import '../models/lcu_connection.dart';
+import '../api/summoner_api.dart';
+import 'lcu_scanner.dart';
 
 /// HTTP client for League Client Update (LCU) API communication.
 /// 
 /// This class provides a configured HTTP client that handles the specific
 /// requirements of the LCU API including SSL certificate validation bypass,
 /// basic authentication, and proper error handling.
+/// 
+/// Use [LcuClient.create] or [LcuClient.connect] to create instances.
 class LcuClient {
   final LcuConnection _connection;
   late final http.Client _httpClient;
+
+  /// Private constructor for internal use only.
+  LcuClient._(this._connection) {
+    _httpClient = _createHttpClient();
+  }
 
   /// Creates a new [LcuClient] instance with the provided connection information.
   /// 
@@ -21,8 +30,41 @@ class LcuClient {
   /// - Accept self-signed certificates (required for LCU API)
   /// - Use HTTP basic authentication with riot credentials
   /// - Handle LCU-specific error responses
-  LcuClient(this._connection) {
-    _httpClient = _createHttpClient();
+  /// 
+  /// Example:
+  /// ```dart
+  /// final connection = await LcuScanner.scanForClient();
+  /// final client = LcuClient.create(connection);
+  /// final summoner = await client.summoner.getCurrentSummoner();
+  /// ```
+  factory LcuClient.create(LcuConnection connection) {
+    return LcuClient._(connection);
+  }
+
+  /// Convenient factory that automatically scans for a League client and creates an instance.
+  /// 
+  /// This method combines [LcuScanner.scanForClient] and [LcuClient.create]
+  /// for a streamlined client creation experience.
+  /// 
+  /// Returns a new [LcuClient] instance connected to the detected League client.
+  /// 
+  /// Throws [ClientNotRunningException] if no League client is found.
+  /// Throws [LockfileNotFoundException] if lockfile cannot be found.
+  /// Throws [InvalidLockfileException] if lockfile format is invalid.
+  /// 
+  /// Example:
+  /// ```dart
+  /// try {
+  ///   final client = await LcuClient.connect();
+  ///   final summoner = await client.summoner.getCurrentSummoner();
+  ///   print('Connected to: ${summoner.displayName}');
+  /// } catch (e) {
+  ///   print('Failed to connect: $e');
+  /// }
+  /// ```
+  static Future<LcuClient> connect() async {
+    final connection = await LcuScanner.scanForClient();
+    return LcuClient.create(connection);
   }
 
   /// Creates an HTTP client configured for LCU API communication.
@@ -216,6 +258,21 @@ class LcuClient {
       );
     }
   }
+
+  /// Gets the connection information used by this client.
+  /// 
+  /// This can be useful for debugging or displaying connection details.
+  LcuConnection get connection => _connection;
+
+  /// Provides access to summoner-related API endpoints.
+  /// 
+  /// Example:
+  /// ```dart
+  /// final client = await LcuClient.connect();
+  /// final summoner = await client.summoner.getCurrentSummoner();
+  /// print('Summoner: ${summoner.displayName}');
+  /// ```
+  SummonerApi get summoner => SummonerApi(this);
 
   /// Closes the HTTP client and releases resources.
   /// 
