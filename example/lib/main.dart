@@ -128,6 +128,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+
   Future<void> testGetSummonerById() async {
     final summonerId = _summonerIdController.text.trim();
     if (summonerId.isEmpty) {

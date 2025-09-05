@@ -69,4 +69,5 @@ class ResultFormatterService {
   String formatValidationError(String message) {
     return '⚠️ $message';
   }
+
 }

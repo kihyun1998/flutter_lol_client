@@ -118,6 +118,7 @@ class LcuService {
     }
   }
 
+
   /// Dispose service and cleanup resources
   void dispose() {
     closeConnection();
