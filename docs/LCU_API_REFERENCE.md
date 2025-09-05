@@ -62,14 +62,30 @@ Manage friends list and social features.
 | `/lol-chat/v1/conversations` | GET | Get chat conversations |
 | `/lol-chat/v1/me` | GET | Get own chat status |
 
-### 6. Game Queue APIs
-Interact with matchmaking queue.
+### 6. Game Queue & Matchmaking APIs
+Interact with matchmaking queue and game flow.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/lol-gameflow/v1/gameflow-phase` | GET | Get current game phase |
 | `/lol-gameflow/v1/session` | GET | Get game session info |
 | `/lol-matchmaking/v1/search` | POST | Start matchmaking |
+| `/lol-matchmaking/v1/search` | DELETE | Cancel matchmaking |
+| `/lol-matchmaking/v1/ready-check` | GET | Get ready check status |
+| `/lol-matchmaking/v1/ready-check/accept` | POST | Accept match |
+| `/lol-matchmaking/v1/ready-check/decline` | POST | Decline match |
+
+#### Game Flow Phases
+- `None` - No active game
+- `Lobby` - In lobby
+- `Matchmaking` - Searching for match
+- `ReadyCheck` - Match found, waiting for acceptance
+- `ChampSelect` - Champion selection phase
+- `GameStart` - Game starting
+- `InProgress` - Game in progress
+- `WaitingForStats` - Game ended, waiting for stats
+- `PreEndOfGame` - Pre-game end
+- `EndOfGame` - Game ended
 
 ### 7. Champion & Item APIs
 Access champion and item data.
@@ -104,6 +120,47 @@ Access information about ongoing games.
 | `/lol-gameflow/v1/spectate/delayed-spectate` | POST | Spectate game |
 | `/lol-spectator/v1/spectate/featured-games` | GET | Get featured games |
 
+### 11. Live Client Data API (In-Game)
+**⚠️ Different Port**: Runs on `https://127.0.0.1:2999` during games
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/liveclientdata/allgamedata` | GET | Complete game state data |
+| `/liveclientdata/activeplayer` | GET | Current player data |
+| `/liveclientdata/playerlist` | GET | All players in game |
+| `/liveclientdata/playerscores` | GET | Player scores and stats |
+| `/liveclientdata/playermainrunes` | GET | Player rune pages |
+| `/liveclientdata/playeritems` | GET | Player item builds |
+| `/liveclientdata/eventdata` | GET | Game events (kills, objectives) |
+| `/liveclientdata/gamestats` | GET | Game statistics |
+
+#### Key Data for Jungle Helper
+- **Jungle Camps**: Monster spawn times, health status
+- **Objectives**: Dragon, Baron, Rift Herald timers
+- **Player Items**: Jungle item progression, smite availability
+- **Game Time**: Precise game timer for camp calculations
+- **Player Position**: Map coordinates for proximity checks
+
+#### Example Response Structure
+```json
+{
+  "gameData": {
+    "gameTime": 847.1,
+    "mapName": "Map11",
+    "mapNumber": 11
+  },
+  "allPlayers": [
+    {
+      "championName": "Graves",
+      "position": "JUNGLE",
+      "summonerSpells": {
+        "summonerSpellOne": { "displayName": "Smite" }
+      }
+    }
+  ]
+}
+```
+
 ## WebSocket Events
 
 The LCU also supports WebSocket connections for real-time events:
@@ -119,6 +176,34 @@ The LCU also supports WebSocket connections for real-time events:
 | `OnJsonApiEvent` | General API state changes |
 | `OnLcuEvent` | League client events |
 | `OnLog` | Client log messages |
+
+### Key WebSocket Events for Auto-Accept & Jungle Helper
+
+#### Auto-Accept Events
+- `OnJsonApiEvent_lol-gameflow_v1_gameflow-phase` - Game flow phase changes
+- `OnJsonApiEvent_lol-matchmaking_v1_ready-check` - Ready check status changes
+- `OnJsonApiEvent_lol-matchmaking_v1_search` - Matchmaking search status
+
+#### Champion Select Events  
+- `OnJsonApiEvent_lol-champ-select_v1_session` - Champion select session updates
+- `OnJsonApiEvent_lol-champ-select_v1_actions` - Champion select actions
+
+#### In-Game Events
+- `OnJsonApiEvent_lol-gameflow_v1_session` - Game session changes
+- `OnJsonApiEvent_lol-spectator_v1_spectate` - Spectator mode events
+
+### WebSocket Message Format
+```json
+[
+  8,
+  "OnJsonApiEvent",
+  {
+    "data": { /* API response data */ },
+    "eventType": "Update|Create|Delete",
+    "uri": "/lol-gameflow/v1/gameflow-phase"
+  }
+]
+```
 
 ## Usage Guidelines
 
@@ -182,6 +267,129 @@ When implementing LCU API calls in Flutter, consider:
 - Discord bot connections
 - Stream overlay data
 - Performance analytics
+
+## Implementation Guides
+
+### 🔄 Auto-Accept Feature
+
+**Required APIs:**
+- `/lol-gameflow/v1/gameflow-phase` - Monitor game state
+- `/lol-matchmaking/v1/ready-check` - Check match status  
+- `/lol-matchmaking/v1/ready-check/accept` - Accept match
+- WebSocket events for real-time updates
+
+**Implementation Steps:**
+1. **WebSocket Connection**: Subscribe to gameflow phase events
+2. **Phase Monitoring**: Listen for `ReadyCheck` phase
+3. **Auto Accept**: POST to accept endpoint when ready check appears
+4. **Error Handling**: Handle network failures, client restarts
+
+**Example Flow:**
+```dart
+// 1. Monitor gameflow phase
+websocket.subscribe('OnJsonApiEvent_lol-gameflow_v1_gameflow-phase');
+
+// 2. Detect ready check
+if (phase == 'ReadyCheck') {
+  // 3. Auto accept
+  await client.post('/lol-matchmaking/v1/ready-check/accept');
+}
+```
+
+### 🌲 Jungle Helper Feature
+
+**Required APIs:**
+- `/liveclientdata/allgamedata` - In-game data (port 2999)
+- `/liveclientdata/eventdata` - Game events
+- `/lol-gameflow/v1/session` - Game session info
+- `/lol-champ-select/v1/session` - Champion select data
+
+**Key Features:**
+1. **Camp Timers**: Track jungle monster respawn times
+2. **Objective Timers**: Dragon, Baron, Rift Herald countdowns  
+3. **Smite Calculator**: Damage calculations based on level
+4. **Route Optimization**: Suggest efficient jungle paths
+5. **Enemy Jungle Tracking**: Predict enemy jungler position
+
+**Implementation Components:**
+
+#### 1. Camp Timer System
+```dart
+class JungleCamp {
+  final String name;
+  final Duration respawnTime;
+  DateTime? lastCleared;
+  
+  DateTime? get nextSpawn => lastCleared?.add(respawnTime);
+  Duration? get timeUntilSpawn => nextSpawn?.difference(DateTime.now());
+}
+
+// Standard jungle camp respawn times
+final Map<String, Duration> campTimers = {
+  'Blue Buff': Duration(minutes: 5),
+  'Red Buff': Duration(minutes: 5),
+  'Krugs': Duration(minutes: 2, seconds: 15),
+  'Gromp': Duration(minutes: 2, seconds: 15),
+  'Wolves': Duration(minutes: 2, seconds: 15),
+  'Raptors': Duration(minutes: 2, seconds: 15),
+};
+```
+
+#### 2. Objective Timer System  
+```dart
+class ObjectiveTracker {
+  static const Map<String, Duration> objectiveTimers = {
+    'Dragon': Duration(minutes: 5),
+    'Baron': Duration(minutes: 7),
+    'Rift Herald': Duration(minutes: 6),
+  };
+  
+  DateTime? dragonKilled;
+  DateTime? baronKilled;
+  DateTime? heraldKilled;
+}
+```
+
+#### 3. Live Data Integration
+```dart
+class JungleHelper {
+  // Monitor game events for camp/objective kills
+  void processGameEvents(List<dynamic> events) {
+    for (var event in events) {
+      if (event['EventName'] == 'ChampionKill') {
+        // Track jungle monster deaths
+        updateCampTimers(event);
+      }
+    }
+  }
+  
+  // Get current game state
+  Future<GameData> getLiveGameData() async {
+    final response = await http.get('https://127.0.0.1:2999/liveclientdata/allgamedata');
+    return GameData.fromJson(json.decode(response.body));
+  }
+}
+```
+
+#### 4. Smite Damage Calculator
+```dart
+class SmiteCalculator {
+  static int getSmiteDamage(int summonerLevel) {
+    // Base damage: 390 + (35 × level)
+    return 390 + (35 * summonerLevel);
+  }
+  
+  static bool canSmiteKill(int monsterHealth, int summonerLevel) {
+    return monsterHealth <= getSmiteDamage(summonerLevel);
+  }
+}
+```
+
+**Implementation Notes:**
+- Use polling for live client data (2999 port only works during games)
+- Combine LCU WebSocket events with live client data
+- Store timer data persistently across game sessions
+- Handle game reconnections and client restarts
 
 ---
 
