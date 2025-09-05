@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_lol_client/flutter_lol_client.dart';
+
+import 'widgets/connection_status_badge.dart';
+import 'panels/left_panel.dart';
+import 'panels/right_panel.dart';
+import 'services/lcu_service.dart';
+import 'services/result_formatter_service.dart';
 
 void main() {
   runApp(MyApp());
@@ -12,9 +17,35 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LoL Client Test',
-      theme: ThemeData(useMaterial3: true),
+      title: 'LoL Client API Tester',
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme:
+            ColorScheme.fromSeed(
+              seedColor: const Color(0xFF1E88E5),
+              brightness: Brightness.dark,
+            ).copyWith(
+              surface: const Color(0xFF1A1A1A),
+              surfaceContainerHighest: const Color(0xFF2D2D2D),
+              primary: const Color(0xFF1E88E5),
+              secondary: const Color(0xFF26A69A),
+            ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF2D2D2D),
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shadowColor: Colors.black26,
+        ),
+        cardTheme: const CardThemeData(
+          color: Color(0xFF2D2D2D),
+          elevation: 3,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+        ),
+      ),
       home: HomePage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -29,27 +60,39 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String result = '';
   bool isLoading = false;
+  String connectionStatus = 'Not Connected';
+  bool isConnected = false;
+  final TextEditingController _summonerIdController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  
+  final LcuService _lcuService = LcuService.instance;
+  final ResultFormatterService _formatter = ResultFormatterService.instance;
 
   Future<void> testConnectionOnly() async {
     setState(() {
       isLoading = true;
-      result = 'Testing connection...';
+      result = _formatter.formatLoadingMessage('Testing connection');
+      connectionStatus = 'Connecting...';
     });
 
     try {
-      final connection = await LcuScanner.scanForClient();
+      final connection = await _lcuService.testConnection();
 
       setState(() {
-        result =
-            'Connection successful!\n'
-            'Host: ${connection.host}\n'
-            'Port: ${connection.port}\n'
-            'Protocol: ${connection.protocol}\n'
-            'Base URL: ${connection.baseUrl}';
+        isConnected = true;
+        connectionStatus = 'Connected (${connection.host}:${connection.port})';
+        result = _formatter.formatConnectionResult({
+          'host': connection.host,
+          'port': connection.port,
+          'protocol': connection.protocol,
+          'baseUrl': connection.baseUrl,
+        });
       });
     } catch (e) {
       setState(() {
-        result = 'Connection failed:\n${e.toString()}';
+        isConnected = false;
+        connectionStatus = 'Connection Failed';
+        result = _formatter.formatConnectionError(e.toString());
       });
     } finally {
       setState(() {
@@ -61,37 +104,60 @@ class _HomePageState extends State<HomePage> {
   Future<void> testGetCurrentSummoner() async {
     setState(() {
       isLoading = true;
-      result = 'Getting current summoner...';
+      result = _formatter.formatLoadingMessage('Getting current summoner');
     });
 
-    LcuClient? client;
     try {
-      client = await LcuClient.connect();
-      final summoner = await client.summoner.getCurrentSummoner();
-
+      final summonerResult = await _lcuService.getCurrentSummoner();
+      
       setState(() {
-        result = 'Current Summoner:\n'
-            'Game Name: ${summoner.gameName}\n'
-            'Display Name: ${summoner.displayName}\n'
-            'Tag Line: ${summoner.tagLine}\n'
-            'Level: ${summoner.summonerLevel}\n'
-            'Privacy: ${summoner.privacy}\n'
-            'Summoner ID: ${summoner.summonerId}\n'
-            'Account ID: ${summoner.accountId}\n'
-            'PUUID: ${summoner.puuid}\n'
-            'Profile Icon ID: ${summoner.profileIconId}\n'
-            'XP Current: ${summoner.xpSinceLastLevel}\n'
-            'XP to Next: ${summoner.xpUntilNextLevel}\n'
-            'Percent Complete: ${summoner.percentCompleteForNextLevel}%\n'
-            'Reroll Points: ${summoner.rerollPoints.currentPoints}/${summoner.rerollPoints.maxRolls}\n'
-            'Name Restrictions: ${summoner.hasNamingRestrictions}';
+        if (summonerResult['success']) {
+          result = _formatter.formatSummonerResult(summonerResult);
+        } else {
+          result = _formatter.formatApiError('Get current summoner', summonerResult['error']);
+        }
       });
     } catch (e) {
       setState(() {
-        result = 'Get current summoner failed:\n${e.toString()}';
+        result = _formatter.formatApiError('Get current summoner', e.toString());
       });
     } finally {
-      client?.close();
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> testGetSummonerById() async {
+    final summonerId = _summonerIdController.text.trim();
+    if (summonerId.isEmpty) {
+      setState(() {
+        result = _formatter.formatValidationError('Please enter a summoner ID');
+      });
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+      result = _formatter.formatLoadingMessage('Getting summoner by ID: $summonerId');
+    });
+
+    try {
+      final parsedId = int.parse(summonerId);
+      final summonerResult = await _lcuService.getSummonerById(parsedId);
+      
+      setState(() {
+        if (summonerResult['success']) {
+          result = _formatter.formatSummonerResult(summonerResult, summonerId: summonerId);
+        } else {
+          result = _formatter.formatApiError('Get summoner by ID', summonerResult['error']);
+        }
+      });
+    } catch (e) {
+      setState(() {
+        result = _formatter.formatApiError('Get summoner by ID', e.toString());
+      });
+    } finally {
       setState(() {
         isLoading = false;
       });
@@ -103,91 +169,70 @@ class _HomePageState extends State<HomePage> {
       Clipboard.setData(ClipboardData(text: result));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Result copied to clipboard'),
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 20),
+              SizedBox(width: 8),
+              Text('📋 Result copied to clipboard'),
+            ],
+          ),
           duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
+  void clearResult() {
+    setState(() {
+      result = '';
+    });
+  }
+
+  @override
+  void dispose() {
+    _summonerIdController.dispose();
+    _scrollController.dispose();
+    _lcuService.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('LoL Client API Test')),
-      body: Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      appBar: AppBar(
+        title: Row(
           children: [
-            // Connection Test
-            ElevatedButton(
-              onPressed: isLoading ? null : testConnectionOnly,
-              child: isLoading
-                  ? CircularProgressIndicator()
-                  : Text('Test Connection Only'),
+            Icon(Icons.gamepad, color: Theme.of(context).colorScheme.primary),
+            const SizedBox(width: 8),
+            const Text('LoL Client API Tester'),
+            const Spacer(),
+            ConnectionStatusBadge(
+              isConnected: isConnected,
+              status: connectionStatus,
             ),
-            SizedBox(height: 10),
-            
-            // Summoner API Section
-            ExpansionTile(
-              title: Text('Summoner API'),
-              children: [
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      ElevatedButton(
-                        onPressed: isLoading ? null : testGetCurrentSummoner,
-                        child: Text('Get Current Summoner'),
-                      ),
-                      SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            // Future API sections can be added here
-            // ExpansionTile(
-            //   title: Text('Match API'),
-            //   children: [...],
-            // ),
-            
-            SizedBox(height: 20),
-            if (result.isNotEmpty) ...[
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Result:',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    onPressed: copyResult,
-                    icon: Icon(Icons.copy),
-                    tooltip: 'Copy result',
-                  ),
-                ],
-              ),
-              SizedBox(height: 10),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: SelectableText(
-                    result,
-                    style: TextStyle(fontFamily: 'monospace'),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
+      ),
+      body: Row(
+        children: [
+          // Left Panel - Controls
+          LeftPanel(
+            onTestConnection: testConnectionOnly,
+            onGetCurrentSummoner: testGetCurrentSummoner,
+            onGetSummonerById: testGetSummonerById,
+            summonerIdController: _summonerIdController,
+            isLoading: isLoading,
+          ),
+
+          // Right Panel - Results
+          RightPanel(
+            result: result,
+            scrollController: _scrollController,
+            onClearResult: clearResult,
+            onCopyResult: copyResult,
+          ),
+        ],
       ),
     );
   }
