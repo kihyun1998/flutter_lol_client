@@ -25,6 +25,7 @@ class ConnectionTestSection extends StatelessWidget {
           label: 'Test Connection',
           backgroundColor: Colors.blue.shade600,
           isLoading: isLoading,
+          tooltip: 'Scan for League client process and test connection',
         ),
       ],
     );

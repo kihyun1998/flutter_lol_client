@@ -6,6 +6,7 @@ class ActionButton extends StatelessWidget {
   final String label;
   final Color backgroundColor;
   final bool isLoading;
+  final String? tooltip;
 
   const ActionButton({
     super.key,
@@ -14,11 +15,12 @@ class ActionButton extends StatelessWidget {
     required this.label,
     required this.backgroundColor,
     this.isLoading = false,
+    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    final button = SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
@@ -51,5 +53,14 @@ class ActionButton extends StatelessWidget {
         ),
       ),
     );
+
+    if (tooltip != null) {
+      return Tooltip(
+        message: tooltip!,
+        child: button,
+      );
+    }
+
+    return button;
   }
 }

@@ -29,6 +29,7 @@ class SummonerApiSection extends StatelessWidget {
           label: 'Get Current Summoner',
           backgroundColor: Colors.green.shade600,
           isLoading: isLoading,
+          tooltip: 'GET /lol-summoner/v1/current-summoner',
         ),
         const SizedBox(height: 12),
         TextField(
@@ -44,6 +45,7 @@ class SummonerApiSection extends StatelessWidget {
               icon: const Icon(Icons.search),
               onPressed: isLoading ? null : onGetSummonerById,
               color: Theme.of(context).colorScheme.primary,
+              tooltip: 'GET /lol-summoner/v1/summoners/{summonerId}',
             ),
           ),
           keyboardType: TextInputType.number,
