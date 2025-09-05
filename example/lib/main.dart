@@ -58,6 +58,46 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> testGetCurrentSummoner() async {
+    setState(() {
+      isLoading = true;
+      result = 'Getting current summoner...';
+    });
+
+    LcuClient? client;
+    try {
+      client = await LcuClient.connect();
+      final summoner = await client.summoner.getCurrentSummoner();
+
+      setState(() {
+        result = 'Current Summoner:\n'
+            'Game Name: ${summoner.gameName}\n'
+            'Display Name: ${summoner.displayName}\n'
+            'Tag Line: ${summoner.tagLine}\n'
+            'Level: ${summoner.summonerLevel}\n'
+            'Privacy: ${summoner.privacy}\n'
+            'Summoner ID: ${summoner.summonerId}\n'
+            'Account ID: ${summoner.accountId}\n'
+            'PUUID: ${summoner.puuid}\n'
+            'Profile Icon ID: ${summoner.profileIconId}\n'
+            'XP Current: ${summoner.xpSinceLastLevel}\n'
+            'XP to Next: ${summoner.xpUntilNextLevel}\n'
+            'Percent Complete: ${summoner.percentCompleteForNextLevel}%\n'
+            'Reroll Points: ${summoner.rerollPoints.currentPoints}/${summoner.rerollPoints.maxRolls}\n'
+            'Name Restrictions: ${summoner.hasNamingRestrictions}';
+      });
+    } catch (e) {
+      setState(() {
+        result = 'Get current summoner failed:\n${e.toString()}';
+      });
+    } finally {
+      client?.close();
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
   void copyResult() {
     if (result.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: result));
@@ -73,18 +113,47 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('LoL Client Test')),
+      appBar: AppBar(title: Text('LoL Client API Test')),
       body: Padding(
         padding: EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Connection Test
             ElevatedButton(
               onPressed: isLoading ? null : testConnectionOnly,
               child: isLoading
                   ? CircularProgressIndicator()
                   : Text('Test Connection Only'),
             ),
+            SizedBox(height: 10),
+            
+            // Summoner API Section
+            ExpansionTile(
+              title: Text('Summoner API'),
+              children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ElevatedButton(
+                        onPressed: isLoading ? null : testGetCurrentSummoner,
+                        child: Text('Get Current Summoner'),
+                      ),
+                      SizedBox(height: 8),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            // Future API sections can be added here
+            // ExpansionTile(
+            //   title: Text('Match API'),
+            //   children: [...],
+            // ),
+            
             SizedBox(height: 20),
             if (result.isNotEmpty) ...[
               Row(
