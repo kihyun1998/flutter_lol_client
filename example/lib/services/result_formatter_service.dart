@@ -27,11 +27,17 @@ class ResultFormatterService {
   }
 
   /// Format summoner data result
-  String formatSummonerResult(Map<String, dynamic> summonerData, {String? summonerId}) {
+  String formatSummonerResult(Map<String, dynamic> summonerData, {String? summonerId, String? puuid}) {
     final data = summonerData['data'];
-    final title = summonerId != null 
-        ? '👤 Summoner by ID ($summonerId)'
-        : '👤 Current Summoner';
+    String title;
+    
+    if (summonerId != null) {
+      title = '👤 Summoner by ID ($summonerId)';
+    } else if (puuid != null) {
+      title = '👤 Summoner by PUUID (${puuid.length > 20 ? "${puuid.substring(0, 20)}..." : puuid})';
+    } else {
+      title = '👤 Current Summoner';
+    }
     
     return '$title\n'
         '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n'
@@ -68,6 +74,35 @@ class ResultFormatterService {
   /// Format validation error
   String formatValidationError(String message) {
     return '⚠️ $message';
+  }
+
+  /// Format generic API result
+  String formatApiResult(String title, Map<String, dynamic> data) {
+    String result = '✅ $title\n'
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    
+    data.forEach((key, value) {
+      result += '$key: $value\n';
+    });
+    
+    return result.trim();
+  }
+
+  /// Format generic result with more flexible formatting
+  String formatGenericResult(String title, Map<String, dynamic> result) {
+    final data = result['data'];
+    String output = '✅ $title\n'
+        '━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+    
+    if (data is Map<String, dynamic>) {
+      data.forEach((key, value) {
+        output += '$key: $value\n';
+      });
+    } else {
+      output += 'Data: $data\n';
+    }
+    
+    return output.trim();
   }
 
 }

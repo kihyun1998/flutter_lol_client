@@ -5,7 +5,7 @@ import 'package:http/io_client.dart';
 
 import '../exceptions/lcu_exceptions.dart';
 import '../models/lcu_connection.dart';
-import '../api/summoner_api.dart';
+import '../api/lol_summoner_api.dart';
 import 'lcu_scanner.dart';
 
 /// HTTP client for League Client Update (LCU) API communication.
@@ -272,7 +272,7 @@ class LcuClient {
   /// final summoner = await client.summoner.getCurrentSummoner();
   /// print('Summoner: ${summoner.displayName}');
   /// ```
-  SummonerApi get summoner => SummonerApi(this);
+  LoLSummonerAPI get summoner => LoLSummonerAPI(this);
 
   /// Closes the HTTP client and releases resources.
   /// 
