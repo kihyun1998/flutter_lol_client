@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:swagger.dysolix.dev)"
+      "WebFetch(domain:swagger.dysolix.dev)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
